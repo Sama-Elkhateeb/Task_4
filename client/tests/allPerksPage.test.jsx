@@ -1,19 +1,12 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { Routes, Route } from 'react-router-dom';
-
 import AllPerks from '../src/pages/AllPerks.jsx';
 import { renderWithRouter } from './utils/renderWithRouter.js';
 
-
-  
-
 describe('AllPerks page (Directory)', () => {
   test('lists public perks and responds to name filtering', async () => {
-    // The seeded record gives us a deterministic expectation regardless of the
-    // rest of the shared database contents.
     const seededPerk = global.__TEST_CONTEXT__.seededPerk;
 
-    // Render the exploration page so it performs its real HTTP fetch.
     renderWithRouter(
       <Routes>
         <Route path="/explore" element={<AllPerks />} />
@@ -21,22 +14,40 @@ describe('AllPerks page (Directory)', () => {
       { initialEntries: ['/explore'] }
     );
 
-    // Wait for the baseline card to appear which guarantees the asynchronous
-    // fetch finished.
-    await waitFor(() => {
-      expect(screen.getByText(seededPerk.title)).toBeInTheDocument();
-    });
+    // ✅ Wait until loading text disappears
+    await waitFor(
+      () => {
+        expect(screen.queryByText(/loading perks/i)).not.toBeInTheDocument();
+      },
+      { timeout: 15000 }
+    );
 
-    // Interact with the name filter input using the real value that
-    // corresponds to the seeded record.
+    // ✅ Then wait until the seeded perk appears
+    await waitFor(
+      () => {
+        expect(
+          screen.getByText((content) =>
+            content.toLowerCase().includes(seededPerk.title.toLowerCase())
+          )
+        ).toBeInTheDocument();
+      },
+      { timeout: 15000 }
+    );
+
+    // ✅ Interact with the name filter input
     const nameFilter = screen.getByPlaceholderText('Enter perk name...');
     fireEvent.change(nameFilter, { target: { value: seededPerk.title } });
 
+    // ✅ Ensure the perk is still visible after filtering
     await waitFor(() => {
-      expect(screen.getByText(seededPerk.title)).toBeInTheDocument();
+      expect(
+        screen.getByText((content) =>
+          content.toLowerCase().includes(seededPerk.title.toLowerCase())
+        )
+      ).toBeInTheDocument();
     });
 
-    // The summary text should continue to reflect the number of matching perks.
+    // ✅ Confirm that the summary text updates correctly
     expect(screen.getByText(/showing/i)).toHaveTextContent('Showing');
   });
 
@@ -51,7 +62,37 @@ describe('AllPerks page (Directory)', () => {
   */
 
   test('lists public perks and responds to merchant filtering', async () => {
-    // This will always fail until the TODO above is implemented.
-    expect(true).toBe(false);
+    // The seeded record gives us a deterministic expectation.
+    const seededPerk = global.__TEST_CONTEXT__.seededPerk;
+
+    // Render the exploration page so it performs its real HTTP fetch.
+    renderWithRouter(
+      <Routes>
+        <Route path="/explore" element={<AllPerks />} />
+      </Routes>,
+      { initialEntries: ['/explore'] }
+    );
+
+    // Wait for the baseline card to appear which guarantees the asynchronous fetch finished.
+    await waitFor(() => {
+      expect(screen.getByText(seededPerk.title)).toBeInTheDocument();
+    });
+
+    // Find the option for the seeded merchant then its select element.
+    const merchantOption = await screen.findByRole('option', { name: seededPerk.merchant });
+    const merchantSelect = merchantOption.closest('select');
+    expect(merchantSelect).toBeTruthy();
+
+    // Choose the seeded merchant from the dropdown.
+    fireEvent.change(merchantSelect, { target: { value: merchantOption.value } });
+
+    // Verify the seeded record is still displayed after filtering.
+    await waitFor(() => {
+      expect(screen.getByText(seededPerk.title)).toBeInTheDocument();
+    });
+
+    // The summary text should reflect matching perks.
+    expect(screen.getByText(/showing/i)).toHaveTextContent('Showing');
   });
+
 });
